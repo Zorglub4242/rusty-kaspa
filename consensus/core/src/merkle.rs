@@ -10,13 +10,19 @@ pub fn calc_hash_merkle_root_pre_crescendo<'a>(txs: impl ExactSizeIterator<Item 
     calc_merkle_root(txs.map(hashing::tx::hash_pre_crescendo))
 }
 
+pub(super) fn calc_accepted_id_merkle_root_pre_crescendo(mut accepted_tx_ids: Vec<Hash>) -> Hash {
+    accepted_tx_ids.sort();
+    calc_merkle_root(accepted_tx_ids.iter().copied())
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::merkle::{calc_hash_merkle_root, calc_hash_merkle_root_pre_crescendo};
+    use crate::merkle::{calc_accepted_id_merkle_root_pre_crescendo, calc_hash_merkle_root, calc_hash_merkle_root_pre_crescendo};
     use crate::{
         subnets::{SUBNETWORK_ID_COINBASE, SUBNETWORK_ID_NATIVE},
         tx::{scriptvec, ScriptPublicKey, Transaction, TransactionId, TransactionInput, TransactionOutpoint, TransactionOutput},
     };
+    use itertools::Itertools;
     use kaspa_hashes::Hash;
 
     #[test]
@@ -267,6 +273,20 @@ mod tests {
                 0x46, 0xec, 0xf4, 0x5b, 0xe3, 0xba, 0xca, 0x34, 0x9d, 0xfe, 0x8a, 0x78, 0xde, 0xaf, 0x05, 0x3b, 0x0a, 0xa6, 0xd5,
                 0x38, 0x97, 0x4d, 0xa5, 0x0f, 0xd6, 0xef, 0xb4, 0xd2, 0x66, 0xbc, 0x8d, 0x21,
             ])
+        );
+
+        let tx_ids = txs.iter().map(|tx| tx.id()).collect_vec();
+        let tx_ids_different_order = {
+            let mut tx_ids_copy = tx_ids.clone();
+            tx_ids_copy[0] = tx_ids[1];
+            tx_ids_copy[1] = tx_ids[0];
+            tx_ids_copy
+        };
+
+        // Make sure that pre-crescendo accepted id merkle root is unaffected by tx id order
+        assert_eq!(
+            calc_accepted_id_merkle_root_pre_crescendo(tx_ids),
+            calc_accepted_id_merkle_root_pre_crescendo(tx_ids_different_order)
         );
     }
 }
